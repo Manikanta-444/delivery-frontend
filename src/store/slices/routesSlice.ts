@@ -77,7 +77,19 @@ export const fetchRoutes = createAsyncThunk(
   async (params: { job_id?: string; status?: string } = {}, { rejectWithValue }) => {
     try {
       const response = await routeOptimizerApiService.getAllRoutes(params);
-      return response.data;
+      
+      // Transform data to fix field name mismatch between backend and frontend
+      const transformedRoutes = response.data.map((route: any) => ({
+        ...route,
+        stops: route.stops?.map((stop: any) => ({
+          ...stop,
+          // Backend returns address_latitude/address_longitude, frontend expects latitude/longitude
+          latitude: stop.address_latitude || stop.latitude,
+          longitude: stop.address_longitude || stop.longitude,
+        })) || []
+      }));
+      
+      return transformedRoutes;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch routes');
     }
@@ -89,7 +101,18 @@ export const fetchRoute = createAsyncThunk(
   async (routeId: string, { rejectWithValue }) => {
     try {
       const response = await routeOptimizerApiService.getRoute(routeId);
-      return response.data;
+      
+      // Transform data to fix field name mismatch
+      const transformedRoute = {
+        ...response.data,
+        stops: response.data.stops?.map((stop: any) => ({
+          ...stop,
+          latitude: stop.address_latitude || stop.latitude,
+          longitude: stop.address_longitude || stop.longitude,
+        })) || []
+      };
+      
+      return transformedRoute;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch route');
     }

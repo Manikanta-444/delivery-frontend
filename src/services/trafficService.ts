@@ -82,7 +82,19 @@ export const trafficApi = {
     trafficServiceApi.get<ApiUsageLog[]>('/traffic/usage-logs', { params }),
   
   getCacheStats: () =>
-    trafficServiceApi.get<{ total_cached_items: number; cache_hit_rate: number; oldest_cache: string; newest_cache: string }>('/traffic/cache-stats'),
+    trafficServiceApi.get<{
+      status: string;
+      total_keys: number;
+      traffic_flow_keys: number;
+      route_keys: number;
+      memory_used_bytes: number;
+      memory_used_mb: number;
+      redis_version: string;
+      uptime_seconds: number;
+      connected_clients: number;
+      used_memory_human: string;
+      timestamp: string;
+    }>('/traffic/cache-stats'),
   
   clearCache: () =>
     trafficServiceApi.delete('/traffic/cache'),

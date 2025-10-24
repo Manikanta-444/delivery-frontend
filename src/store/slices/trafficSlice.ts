@@ -7,10 +7,17 @@ interface TrafficState {
   routeTraffic: RouteTrafficResponse | null;
   apiUsageLogs: ApiUsageLog[];
   cacheStats: {
-    total_cached_items: number;
-    cache_hit_rate: number;
-    oldest_cache: string;
-    newest_cache: string;
+    status: string;
+    total_keys: number;
+    traffic_flow_keys: number;
+    route_keys: number;
+    memory_used_bytes: number;
+    memory_used_mb: number;
+    redis_version: string;
+    uptime_seconds: number;
+    connected_clients: number;
+    used_memory_human: string;
+    timestamp: string;
   } | null;
   isLoading: boolean;
   error: string | null;
@@ -159,12 +166,15 @@ const trafficSlice = createSlice({
       })
       .addCase(fetchTrafficIncidents.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.trafficIncidents = action.payload;
+        // Ensure trafficIncidents is always an array
+        state.trafficIncidents = Array.isArray(action.payload) ? action.payload : [];
         state.error = null;
       })
       .addCase(fetchTrafficIncidents.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        // Ensure trafficIncidents remains an array even on error
+        state.trafficIncidents = [];
       })
       // Fetch route traffic
       .addCase(fetchRouteTraffic.pending, (state) => {

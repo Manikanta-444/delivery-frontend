@@ -34,7 +34,9 @@ export const TrafficAlerts: React.FC<TrafficAlertsProps> = ({ incidents, isLoadi
     );
   }
 
-  const activeIncidents = incidents.filter(incident => incident.status === 'ACTIVE');
+  // Ensure incidents is an array before filtering
+  const safeIncidents = Array.isArray(incidents) ? incidents : [];
+  const activeIncidents = safeIncidents.filter(incident => incident.status === 'ACTIVE');
 
   return (
     <div className="card">

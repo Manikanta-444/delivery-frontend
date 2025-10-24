@@ -20,10 +20,26 @@ export const TrafficPage: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState({ lat: 28.6139, lng: 77.2090 });
   const [showTrafficFlow, setShowTrafficFlow] = useState(false);
 
+  // Try to take location from the device and update selectedLocation
   useEffect(() => {
-    dispatch(fetchTrafficIncidents({}));
-    dispatch(fetchCacheStats());
-  }, [dispatch]);
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setSelectedLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+    );
+  }, []);
+
+useEffect(() => {
+  dispatch(fetchTrafficIncidents({
+    lat: selectedLocation.lat,
+    lng: selectedLocation.lng,
+    radius: 1000,
+  }));
+  dispatch(fetchCacheStats());
+}, [dispatch, selectedLocation.lat, selectedLocation.lng]);
 
   const handleGetTrafficFlow = async () => {
     try {
@@ -175,24 +191,24 @@ export const TrafficPage: React.FC = () => {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-primary-600">{cacheStats.total_cached_items}</p>
+                <p className="text-2xl font-bold text-primary-600">{cacheStats.total_keys}</p>
                 <p className="text-sm text-secondary-600">Cached Items</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{Math.round(cacheStats.cache_hit_rate * 100)}%</p>
-                <p className="text-sm text-secondary-600">Hit Rate</p>
+                <p className="text-2xl font-bold text-green-600">{cacheStats.memory_used_mb || 0} MB</p>
+                <p className="text-sm text-secondary-600">Memory Used</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-secondary-900">
-                  {format(new Date(cacheStats.oldest_cache), 'MMM d, HH:mm')}
+                  {cacheStats.redis_version || 'N/A'}
                 </p>
-                <p className="text-sm text-secondary-600">Oldest Cache</p>
+                <p className="text-sm text-secondary-600">Redis Version</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-secondary-900">
-                  {format(new Date(cacheStats.newest_cache), 'MMM d, HH:mm')}
+                  {cacheStats.timestamp ? format(new Date(cacheStats.timestamp), 'MMM d, HH:mm') : 'N/A'}
                 </p>
-                <p className="text-sm text-secondary-600">Newest Cache</p>
+                <p className="text-sm text-secondary-600">Last Updated</p>
               </div>
             </div>
           </div>

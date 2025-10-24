@@ -19,13 +19,25 @@ export const Dashboard: React.FC = () => {
   const { orders, isLoading: ordersLoading } = useAppSelector((state) => state.orders);
   const { jobs, isLoading: jobsLoading } = useAppSelector((state) => state.routes);
   const { trafficIncidents, cacheStats, isLoading: trafficLoading } = useAppSelector((state) => state.traffic);
+  const [deviceLocation, setDeviceLocation] = React.useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setDeviceLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setDeviceLocation(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+      );
+    }
+  }, []);
 
   useEffect(() => {
     dispatch(fetchOrders({ limit: 10 }));
     dispatch(fetchOptimizationJobs({ limit: 5 }));
-    dispatch(fetchTrafficIncidents({}));
+    const loc = deviceLocation || { lat: 28.6139, lng: 77.2090 };
+    dispatch(fetchTrafficIncidents({ lat: loc.lat, lng: loc.lng, radius: 1000 }));
     dispatch(fetchCacheStats());
-  }, [dispatch]);
+  }, [dispatch, deviceLocation]);
 
   const stats = [
     {
@@ -44,18 +56,12 @@ export const Dashboard: React.FC = () => {
     },
     {
       name: 'Traffic Incidents',
-      value: trafficIncidents.filter(incident => incident.status === 'ACTIVE').length.toString(),
+      value: Array.isArray(trafficIncidents) ? trafficIncidents.filter(incident => incident.status === 'ACTIVE').length.toString() : '0',
       change: '-2',
       changeType: 'negative' as const,
       icon: ExclamationTriangleIcon,
     },
-    {
-      name: 'Cache Hit Rate',
-      value: cacheStats ? `${Math.round(cacheStats.cache_hit_rate * 100)}%` : '0%',
-      change: '+5%',
-      changeType: 'positive' as const,
-      icon: ClockIcon,
-    },
+    { name: 'Cached Items', value: cacheStats ? cacheStats.total_keys.toString() : '0', change: '+0', changeType: 'positive' as const, icon: ClockIcon, },
   ];
 
   return (
@@ -90,7 +96,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Traffic Alerts */}
       <div className="lg:col-span-2">
-        <TrafficAlerts incidents={trafficIncidents.slice(0, 5)} isLoading={trafficLoading} />
+        <TrafficAlerts incidents={Array.isArray(trafficIncidents) ? trafficIncidents.slice(0, 5) : []} isLoading={trafficLoading} />
       </div>
     </div>
   );

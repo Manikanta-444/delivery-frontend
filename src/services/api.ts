@@ -4,17 +4,18 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:800
 
 // Create axios instances for each service
 export const orderServiceApi = axios.create({
-  baseURL: `${API_BASE_URL.replace('8000', '8001')}/api/v1`,
+  baseURL: `http://localhost:8001/api/v1`,
   timeout: 10000,
 });
 
 export const routeOptimizerApi = axios.create({
-  baseURL: `${API_BASE_URL.replace('8000', '8001')}/api/v1`,
+  baseURL: `http://localhost:8003/api/v1`,
   timeout: 30000, // Longer timeout for optimization requests
 });
+console.log('routeOptimizerApi', routeOptimizerApi.defaults.baseURL);
 
 export const trafficServiceApi = axios.create({
-  baseURL: `${API_BASE_URL.replace('8000', '8002')}/api/v1`,
+  baseURL: `http://localhost:8002/api/v1`,
   timeout: 10000,
 });
 

@@ -6,12 +6,8 @@ import { OptimizationJob, OptimizedRoute, OptimizationRequest } from '../service
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import {
-  PlayIcon,
-  EyeIcon,
-  MapIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+import { PlayIcon, EyeIcon, MapIcon, ClockIcon, XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import RouteMap from '../components/RouteMap';
 
 export const RouteOptimizationPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -27,6 +23,19 @@ export const RouteOptimizationPage: React.FC = () => {
     optimization_criteria: 'MINIMIZE_DISTANCE' as const,
     use_traffic_data: true,
   });
+  
+  // Depot location state
+  const [depotLocation, setDepotLocation] = useState<{
+    latitude: string;
+    longitude: string;
+    useDeviceLocation: boolean;
+    isDetecting: boolean;
+  }>({
+    latitude: '',
+    longitude: '',
+    useDeviceLocation: false,
+    isDetecting: false,
+  });
 
   useEffect(() => {
     dispatch(fetchOptimizationJobs({}));
@@ -34,24 +43,64 @@ export const RouteOptimizationPage: React.FC = () => {
     dispatch(fetchOrders({}));
   }, [dispatch]);
 
+  // Get device location
+  const handleGetDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setDepotLocation(prev => ({ ...prev, isDetecting: true }));
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setDepotLocation({
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+          useDeviceLocation: true,
+          isDetecting: false,
+        });
+        toast.success('📍 Location detected successfully!');
+      },
+      (error) => {
+        setDepotLocation(prev => ({ ...prev, isDetecting: false }));
+        toast.error(`Failed to get location: ${error.message}`);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
   const handleStartOptimization = async () => {
     if (selectedOrders.length === 0) {
       toast.error('Please select at least one order');
       return;
     }
 
+    // Build constraints with optional depot location
+    const constraints: any = {
+      max_stops_per_route: 10,
+      max_route_duration_minutes: 480,
+      max_vehicles: optimizationParams.max_vehicles,
+      vehicle_capacity_kg: optimizationParams.vehicle_capacity_kg,
+      optimization_criteria: optimizationParams.optimization_criteria,
+      working_hours_start: '08:00',
+      working_hours_end: '18:00',
+    };
+
+    // Add depot location if provided
+    if (depotLocation.latitude && depotLocation.longitude) {
+      constraints.depot_latitude = parseFloat(depotLocation.latitude);
+      constraints.depot_longitude = parseFloat(depotLocation.longitude);
+    }
+
     const request: OptimizationRequest = {
       order_ids: selectedOrders,
       job_name: optimizationParams.job_name || `Optimization_${new Date().toISOString()}`,
-      constraints: {
-        max_stops_per_route: 10,
-        max_route_duration_minutes: 480,
-        max_vehicles: optimizationParams.max_vehicles,
-        vehicle_capacity_kg: optimizationParams.vehicle_capacity_kg,
-        optimization_criteria: optimizationParams.optimization_criteria,
-        working_hours_start: '08:00',
-        working_hours_end: '18:00',
-      },
+      constraints,
       use_traffic_data: optimizationParams.use_traffic_data,
     };
 
@@ -79,6 +128,8 @@ export const RouteOptimizationPage: React.FC = () => {
     COMPLETED: 'bg-green-100 text-green-800',
     CANCELLED: 'bg-red-100 text-red-800',
   };
+
+  const [mapRoute, setMapRoute] = useState<OptimizedRoute | null>(null);
 
   return (
     <div className="space-y-6">
@@ -157,6 +208,60 @@ export const RouteOptimizationPage: React.FC = () => {
                   <option value="MINIMIZE_TIME">Minimize Time</option>
                   <option value="MINIMIZE_COST">Minimize Cost</option>
                 </select>
+              </div>
+
+              {/* Depot Location Section */}
+              <div className="border-t border-secondary-200 pt-4 mt-4">
+                <label className="label flex items-center justify-between">
+                  <span>Depot/Starting Location (Optional)</span>
+                  <button
+                    type="button"
+                    onClick={handleGetDeviceLocation}
+                    disabled={depotLocation.isDetecting}
+                    className="text-sm text-primary-600 hover:text-primary-800 disabled:text-secondary-400 flex items-center"
+                  >
+                    <MapPinIcon className="h-4 w-4 mr-1" />
+                    {depotLocation.isDetecting ? 'Detecting...' : 'Use My Location'}
+                  </button>
+                </label>
+                
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <label className="text-xs text-secondary-600">Latitude</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      className="input-field text-sm"
+                      value={depotLocation.latitude}
+                      onChange={(e) => setDepotLocation({ ...depotLocation, latitude: e.target.value, useDeviceLocation: false })}
+                      placeholder="e.g., 28.6139"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-secondary-600">Longitude</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      className="input-field text-sm"
+                      value={depotLocation.longitude}
+                      onChange={(e) => setDepotLocation({ ...depotLocation, longitude: e.target.value, useDeviceLocation: false })}
+                      placeholder="e.g., 77.2090"
+                    />
+                  </div>
+                </div>
+                
+                {depotLocation.useDeviceLocation && (
+                  <div className="mt-2 text-xs text-green-600 flex items-center">
+                    <MapPinIcon className="h-4 w-4 mr-1" />
+                    Using device location
+                  </div>
+                )}
+                
+                {!depotLocation.latitude && !depotLocation.longitude && (
+                  <p className="mt-2 text-xs text-secondary-500">
+                    Leave empty to use default depot location from settings
+                  </p>
+                )}
               </div>
 
               <div>
@@ -319,7 +424,11 @@ export const RouteOptimizationPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button className="text-primary-600 hover:text-primary-900">
+                  <button
+                    className="text-primary-600 hover:text-primary-900"
+                    onClick={() => setMapRoute(route)}
+                    title="View route on map"
+                  >
                     <EyeIcon className="h-5 w-5" />
                   </button>
                 </div>
@@ -328,6 +437,41 @@ export const RouteOptimizationPage: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {mapRoute && mapRoute.stops && mapRoute.stops.length > 0 && (
+        <div className="fixed inset-0 bg-secondary-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-5xl mx-4 shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200">
+              <h3 className="text-lg font-medium text-secondary-900">
+                {mapRoute.route_name || 'Route'} — Map
+              </h3>
+              <button className="text-secondary-500 hover:text-secondary-700" onClick={() => setMapRoute(null)}>
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-4">
+              <RouteMap route={mapRoute} height={520} />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {mapRoute && (!mapRoute.stops || mapRoute.stops.length === 0) && (
+        <div className="fixed inset-0 bg-secondary-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-secondary-900 mb-2">No Route Data</h3>
+              <p className="text-secondary-600 mb-4">This route has no stops to display on the map.</p>
+              <button
+                className="btn-primary"
+                onClick={() => setMapRoute(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
