@@ -6,6 +6,7 @@ interface RoutesState {
   routes: OptimizedRoute[];
   selectedJob: OptimizationJob | null;
   selectedRoute: OptimizedRoute | null;
+  jobDetails: any | null;
   isLoading: boolean;
   error: string | null;
   filters: {
@@ -25,6 +26,7 @@ const initialState: RoutesState = {
   routes: [],
   selectedJob: null,
   selectedRoute: null,
+  jobDetails: null,
   isLoading: false,
   error: null,
   filters: {},
@@ -68,6 +70,18 @@ export const fetchOptimizationJob = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch optimization job');
+    }
+  }
+);
+
+export const deleteOptimizationJob = createAsyncThunk(
+  'routes/deleteOptimizationJob',
+  async (jobId: string, { rejectWithValue }) => {
+    try {
+      const response = await routeOptimizerApiService.deleteJob(jobId);
+      return { jobId, result: response.data };
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to delete job');
     }
   }
 );
@@ -210,8 +224,22 @@ const routesSlice = createSlice({
       // Fetch optimization job
       .addCase(fetchOptimizationJob.fulfilled, (state, action) => {
         state.selectedJob = action.payload as OptimizationJob;
-        if (action.payload.routes) {
-          state.routes = action.payload.routes;
+        // Store full details for UI card/modal
+        state.jobDetails = action.payload as any;
+        if ((action.payload as any).routes) {
+          state.routes = (action.payload as any).routes;
+        }
+      })
+      // Delete optimization job
+      .addCase(deleteOptimizationJob.fulfilled, (state, action) => {
+        const jobId = action.payload.jobId;
+        state.jobs = state.jobs.filter(j => j.job_id !== jobId);
+        // Clear details if the deleted job is currently selected
+        if (state.selectedJob?.job_id === jobId) {
+          state.selectedJob = null;
+        }
+        if ((state.jobDetails as any)?.job_id === jobId) {
+          state.jobDetails = null;
         }
       })
       // Fetch routes

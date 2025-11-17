@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchOptimizationJobs, fetchRoutes, optimizeRoutes } from '../store/slices/routesSlice';
+import { fetchOptimizationJobs, fetchRoutes, optimizeRoutes, fetchOptimizationJob, deleteOptimizationJob } from '../store/slices/routesSlice';
 import { fetchOrders } from '../store/slices/ordersSlice';
 import { OptimizationJob, OptimizedRoute, OptimizationRequest } from '../services/routeOptimizerService';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { PlayIcon, EyeIcon, MapIcon, ClockIcon, XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, EyeIcon, MapIcon, ClockIcon, XMarkIcon, MapPinIcon, TrashIcon } from '@heroicons/react/24/outline';
 import RouteMap from '../components/RouteMap';
 
 export const RouteOptimizationPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { jobs, routes, isLoading } = useAppSelector((state) => state.routes);
+  const { jobs, routes, isLoading, jobDetails } = useAppSelector((state) => state.routes);
   const { orders } = useAppSelector((state) => state.orders);
   
   const [showOptimizationForm, setShowOptimizationForm] = useState(false);
@@ -130,6 +130,52 @@ export const RouteOptimizationPage: React.FC = () => {
   };
 
   const [mapRoute, setMapRoute] = useState<OptimizedRoute | null>(null);
+  const [showJobDetails, setShowJobDetails] = useState(false);
+
+  // Helpers to safely format numeric values that might arrive as strings
+  const toNumber = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (value == null) return 0;
+    const n = Number(value);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const formatNumber = (value: any, decimals = 1): string => {
+    const n = toNumber(value);
+    return Number.isFinite(n) ? n.toFixed(decimals) : '0'.padEnd(decimals ? 2 + decimals : 1, '0');
+  };
+
+  const safeFormatDate = (value: any, fmt = 'MMM d, yyyy HH:mm'): string => {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return 'N/A';
+    try {
+      return format(d, fmt);
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const openJobDetails = async (jobId: string) => {
+    try {
+      await dispatch(fetchOptimizationJob(jobId)).unwrap();
+      setShowJobDetails(true);
+    } catch (e) {
+      toast.error('Failed to load job details');
+    }
+  };
+
+  const handleDeleteJob = async (e: React.MouseEvent, jobId: string, jobName: string) => {
+    e.stopPropagation();
+    const ok = window.confirm(`Delete job "${jobName}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await dispatch(deleteOptimizationJob(jobId)).unwrap();
+      toast.success('Job deleted');
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -323,6 +369,90 @@ export const RouteOptimizationPage: React.FC = () => {
         </div>
       )}
 
+      {/* Job Details Modal */}
+      {showJobDetails && jobDetails && (
+        <div className="fixed inset-0 bg-secondary-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-3xl mx-4 shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200">
+              <h3 className="text-lg font-medium text-secondary-900">Job Details</h3>
+              <button className="text-secondary-500 hover:text-secondary-700" onClick={() => setShowJobDetails(false)}>
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-secondary-500">Job Name</div>
+                  <div className="text-sm font-medium text-secondary-900">{jobDetails.job_name}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Status</div>
+                  <span className={clsx(
+                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                    statusColors[(jobDetails.job_status || 'PENDING') as keyof typeof statusColors]
+                  )}>
+                    {String(jobDetails.job_status || '').replace('_', ' ')}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Total Orders</div>
+                  <div className="text-sm text-secondary-900">{jobDetails.total_orders}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Max Vehicles</div>
+                  <div className="text-sm text-secondary-900">{jobDetails.max_vehicles}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Vehicle Capacity (kg)</div>
+                  <div className="text-sm text-secondary-900">{jobDetails.vehicle_capacity_kg}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Criteria</div>
+                  <div className="text-sm text-secondary-900">{String(jobDetails.optimization_criteria || '').replace('_', ' ')}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Created</div>
+                  <div className="text-sm text-secondary-900">{safeFormatDate(jobDetails.created_at)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-500">Updated</div>
+                  <div className="text-sm text-secondary-900">{safeFormatDate(jobDetails.updated_at)}</div>
+                </div>
+                {jobDetails.completed_at && (
+                  <div>
+                    <div className="text-xs text-secondary-500">Completed</div>
+                    <div className="text-sm text-secondary-900">{safeFormatDate(jobDetails.completed_at)}</div>
+                  </div>
+                )}
+              </div>
+
+              {jobDetails.summary && (
+                <div className="mt-2 border-t border-secondary-200 pt-4">
+                  <h4 className="text-sm font-medium text-secondary-900 mb-2">Summary</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-secondary-700">
+                    <div><span className="font-medium">Routes:</span> {jobDetails.summary.total_routes}</div>
+                    <div><span className="font-medium">Distance:</span> {jobDetails.summary.total_distance_km?.toFixed?.(1) || jobDetails.summary.total_distance_km} km</div>
+                    <div><span className="font-medium">Duration:</span> {Math.round(jobDetails.summary.total_duration_minutes)} min</div>
+                    <div><span className="font-medium">Orders Optimized:</span> {jobDetails.summary.total_orders_optimized}</div>
+                    <div><span className="font-medium">Avg Dist/Route:</span> {jobDetails.summary.average_distance_per_route?.toFixed?.(1) || jobDetails.summary.average_distance_per_route} km</div>
+                    <div><span className="font-medium">Avg Dur/Route:</span> {Math.round(jobDetails.summary.average_duration_per_route)} min</div>
+                  </div>
+                </div>
+              )}
+
+              {jobDetails.error_message && (
+                <div className="mt-2 p-3 bg-red-50 text-red-700 rounded border border-red-200 text-sm">
+                  {jobDetails.error_message}
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end">
+                <button className="btn-primary" onClick={() => setShowJobDetails(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Optimization Jobs */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-6 py-4 border-b border-secondary-200">
@@ -340,7 +470,7 @@ export const RouteOptimizationPage: React.FC = () => {
         ) : (
           <div className="divide-y divide-secondary-200">
             {jobs.map((job) => (
-              <div key={job.job_id} className="p-6">
+              <div key={job.job_id} className="p-6 cursor-pointer hover:bg-secondary-50" onClick={() => openJobDetails(job.job_id)}>
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
@@ -367,13 +497,17 @@ export const RouteOptimizationPage: React.FC = () => {
                         <span className="font-medium">Criteria:</span> {job.optimization_criteria.replace('_', ' ')}
                       </div>
                       <div>
-                        <span className="font-medium">Created:</span> {format(new Date(job.created_at), 'MMM d, HH:mm')}
+                        <span className="font-medium">Created:</span> {safeFormatDate(job.created_at, 'MMM d, HH:mm')}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <button className="text-primary-600 hover:text-primary-900">
-                      <EyeIcon className="h-5 w-5" />
+                    <button
+                      className="text-red-600 hover:text-red-800"
+                      title="Delete job"
+                      onClick={(e) => handleDeleteJob(e, job.job_id, job.job_name)}
+                    >
+                      <TrashIcon className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
@@ -410,16 +544,27 @@ export const RouteOptimizationPage: React.FC = () => {
                   </div>
                   <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-secondary-600">
                     <div>
-                      <span className="font-medium">Distance:</span> {route.total_distance_km.toFixed(1)} km
+                      <span className="font-medium">Distance:</span> {formatNumber((route as any).total_distance_km ?? (route as any).total_distance, 1)} km
                     </div>
                     <div>
-                      <span className="font-medium">Duration:</span> {route.total_duration_minutes} min
+                      <span className="font-medium">Duration:</span>{' '}
+                      {(() => {
+                        const est = (route as any).estimated_duration_minutes;
+                        const total = (route as any).total_duration_minutes;
+                        if (est != null) return `${Math.round(toNumber(est))} min`;
+                        if (total != null) return `${Math.round(toNumber(total))} min`;
+                        if ((route as any).start_time && (route as any).end_time) {
+                          const mins = Math.max(0, Math.round((new Date((route as any).end_time).getTime() - new Date((route as any).start_time).getTime()) / 60000));
+                          return `${mins} min`;
+                        }
+                        return 'N/A';
+                      })()}
                     </div>
                     <div>
-                      <span className="font-medium">Stops:</span> {route.total_stops}
+                      <span className="font-medium">Stops:</span> {((route as any).total_stops ?? (route as any).stops?.length ?? 0)}
                     </div>
                     <div>
-                      <span className="font-medium">Weight:</span> {route.total_weight_kg.toFixed(1)} kg
+                      <span className="font-medium">Weight:</span> {formatNumber((route as any).total_weight_kg ?? (route as any).total_load_kg, 1)} kg
                     </div>
                   </div>
                 </div>

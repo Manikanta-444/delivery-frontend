@@ -13,6 +13,20 @@ import {
   EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 
+const formatCoordinate = (value?: number | string, fractionDigits = 4): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const numericValue = typeof value === 'number' ? value : Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  return numericValue.toFixed(fractionDigits);
+};
+
 export const DriversPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { drivers, isLoading } = useAppSelector((state) => state.orders);
@@ -110,71 +124,76 @@ export const DriversPage: React.FC = () => {
         ) : (
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredDrivers.map((driver) => (
-                <div key={driver.driver_id} className="card hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
-                          <TruckIcon className="h-6 w-6 text-primary-600" />
+              {filteredDrivers.map((driver) => {
+                const formattedLatitude = formatCoordinate(driver.current_latitude);
+                const formattedLongitude = formatCoordinate(driver.current_longitude);
+
+                return (
+                  <div key={driver.driver_id} className="card hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
+                          <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
+                            <TruckIcon className="h-6 w-6 text-primary-600" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-lg font-medium text-secondary-900 truncate">
+                            {driver.first_name} {driver.last_name}
+                          </h4>
+                          <p className="text-sm text-secondary-500">License: {driver.license_number}</p>
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-lg font-medium text-secondary-900 truncate">
-                          {driver.first_name} {driver.last_name}
-                        </h4>
-                        <p className="text-sm text-secondary-500">License: {driver.license_number}</p>
-                      </div>
+                      <span
+                        className={clsx(
+                          'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                          driver.is_available
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        )}
+                      >
+                        {driver.is_available ? 'Available' : 'Unavailable'}
+                      </span>
                     </div>
-                    <span
-                      className={clsx(
-                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                        driver.is_available
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      )}
-                    >
-                      {driver.is_available ? 'Available' : 'Unavailable'}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-secondary-600">
-                      <EnvelopeIcon className="h-4 w-4 mr-2 text-secondary-400" />
-                      <span className="truncate">{driver.email}</span>
-                    </div>
-                    <div className="flex items-center text-sm text-secondary-600">
-                      <PhoneIcon className="h-4 w-4 mr-2 text-secondary-400" />
-                      <span>{driver.phone}</span>
-                    </div>
-                    <div className="flex items-center text-sm text-secondary-600">
-                      <TruckIcon className="h-4 w-4 mr-2 text-secondary-400" />
-                      <span>{driver.vehicle_type} • {driver.vehicle_capacity_kg}kg capacity</span>
-                    </div>
-                    {driver.current_latitude && driver.current_longitude && (
+                    
+                    <div className="space-y-2">
                       <div className="flex items-center text-sm text-secondary-600">
-                        <MapPinIcon className="h-4 w-4 mr-2 text-secondary-400" />
-                        <span>Location: {driver.current_latitude.toFixed(4)}, {driver.current_longitude.toFixed(4)}</span>
+                        <EnvelopeIcon className="h-4 w-4 mr-2 text-secondary-400" />
+                        <span className="truncate">{driver.email}</span>
                       </div>
-                    )}
+                      <div className="flex items-center text-sm text-secondary-600">
+                        <PhoneIcon className="h-4 w-4 mr-2 text-secondary-400" />
+                        <span>{driver.phone}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-secondary-600">
+                        <TruckIcon className="h-4 w-4 mr-2 text-secondary-400" />
+                        <span>{driver.vehicle_type} • {driver.vehicle_capacity_kg}kg capacity</span>
+                      </div>
+                      {formattedLatitude && formattedLongitude && (
+                        <div className="flex items-center text-sm text-secondary-600">
+                          <MapPinIcon className="h-4 w-4 mr-2 text-secondary-400" />
+                          <span>Location: {formattedLatitude}, {formattedLongitude}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-secondary-200">
+                      <p className="text-xs text-secondary-500">
+                        Driver since {format(new Date(driver.created_at), 'MMM yyyy')}
+                      </p>
+                    </div>
+                    
+                    <div className="mt-4 flex space-x-2">
+                      <button className="flex-1 text-sm font-medium text-primary-600 hover:text-primary-500">
+                        View Details
+                      </button>
+                      <button className="flex-1 text-sm font-medium text-secondary-600 hover:text-secondary-500">
+                        Edit
+                      </button>
+                    </div>
                   </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-secondary-200">
-                    <p className="text-xs text-secondary-500">
-                      Driver since {format(new Date(driver.created_at), 'MMM yyyy')}
-                    </p>
-                  </div>
-                  
-                  <div className="mt-4 flex space-x-2">
-                    <button className="flex-1 text-sm font-medium text-primary-600 hover:text-primary-500">
-                      View Details
-                    </button>
-                    <button className="flex-1 text-sm font-medium text-secondary-600 hover:text-secondary-500">
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             {filteredDrivers.length === 0 && (

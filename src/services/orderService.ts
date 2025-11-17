@@ -67,10 +67,10 @@ export interface Driver {
   phone: string;
   license_number: string;
   vehicle_type: string;
-  vehicle_capacity_kg: number;
+  vehicle_capacity_kg: number | string;
   is_available: boolean;
-  current_latitude?: number;
-  current_longitude?: number;
+  current_latitude?: number | string;
+  current_longitude?: number | string;
   created_at: string;
   updated_at: string;
 }

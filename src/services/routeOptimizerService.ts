@@ -111,6 +111,9 @@ export const routeOptimizerApiService = {
   getAllJobs: (params?: { skip?: number; limit?: number; status?: string }) =>
     routeOptimizerApi.get<OptimizationJob[]>('/routes/jobs', { params }),
   
+  deleteJob: (jobId: string) =>
+    routeOptimizerApi.delete<{ status: string; message?: string }>(`/routes/jobs/${jobId}`),
+  
   getRoute: (routeId: string) =>
     routeOptimizerApi.get<OptimizedRoute>(`/routes/${routeId}`),
   
